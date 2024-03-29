@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Function to display messages in a formatted manner
+display_message() {
+    echo "**********************************************"
+    echo "$1"
+    echo "**********************************************"
+    echo
+}
+
+# Function to check if a package is installed and install it if not
+install_package() {
+    package=$1
+    if ! dpkg -l | grep -q "^ii\s*$package"; then
+        display_message "Installing $package"
+        sudo apt update
+        sudo apt install -y $package
+    else
+        display_message "$package is already installed"
+    fi
+}
+
+# Function to update netplan configuration with new IP address
+update_netplan() {
+    display_message "Updating netplan configuration"
+    sudo sed -i 's/address: 192.168.16.*$/address: 192.168.16.21\/24/' /etc/netplan/01-netcfg.yaml
+    sudo netplan apply
+}
+
+# Function to update /etc/hosts file with new IP address
+update_hosts_file() {
+    display_message "Updating /etc/hosts file"
+    sudo sed -i '/server1/d' /etc/hosts
+    sudo sh -c "echo '192.168.16.21 server1' >> /etc/hosts"
+}
+
+# Function to configure firewall rules
+configure_firewall() {
+    display_message "Configuring firewall rules"
+    sudo ufw allow OpenSSH
+    sudo ufw allow 'Apache'
+    sudo ufw allow 'Squid'
+    sudo ufw --force enable
+}
+
+# Function to create user accounts and set up SSH keys
+setup_user_accounts() {
+    display_message "Setting up user accounts"
+    users=("dennis" "aubrey" "captain" "snibbles" "brownie" "scooter" "sandy" "perrier" "cindy" "tiger" "yoda")
+    for user in "${users[@]}"; do
+        sudo useradd -m -s /bin/bash $user
+        sudo mkdir -p /home/$user/.ssh
+        sudo touch /home/$user/.ssh/authorized_keys
+        sudo chown -R $user:$user /home/$user/.ssh
+        sudo chmod 700 /home/$user/.ssh
+        sudo chmod 600 /home/$user/.ssh/authorized_keys
+        sudo sh -c "echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG4rT3vTt99Ox5kndS4HmgTrKBT8SKzhK4rhGkEVGlCI student@generic-vm' >> /home/$user/.ssh/authorized_keys"
+        sudo -u $user ssh-keygen -t rsa -N "" -f /home/$user/.ssh/id_rsa
+        sudo -u $user ssh-keygen -t ed25519 -N "" -f /home/$user/.ssh/id_ed25519
+    done
+    # Giving sudo access to dennis
+    sudo usermod -aG sudo dennis
+}
+
+# Main function
+main() {
+    display_message "Starting Assignment 2 Setup"
+    
+    # Update netplan configuration
+    update_netplan
+    
+    # Update /etc/hosts file
+    update_hosts_file
+    
+    # Install required software packages
+    install_package "apache2"
+    install_package "squid"
+    
+    # Configure firewall
+    configure_firewall
+    
+    # Setup user accounts
+    setup_user_accounts
+    
+    display_message "Assignment 2 Setup Complete"
+}
+
+# Execute main function
+main
